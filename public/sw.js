@@ -1,4 +1,4 @@
-const CACHE = 'fx-convert-v1';
+const CACHE = 'fx-convert-v1.1';
 const PRECACHE = [
   '/fx-convert/',
   '/fx-convert/index.html',
