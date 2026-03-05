@@ -201,8 +201,7 @@ function Picker({ isOpen, onClose, onSelect, selected, favourites, onToggleFav, 
   const ref = useRef(null);
 
   useEffect(() => {
-    if (isOpen) setTimeout(() => ref.current?.focus(), 100);
-    else setSearch("");
+    if (!isOpen) setSearch("");
   }, [isOpen]);
 
   if (!isOpen) return null;
