@@ -162,8 +162,8 @@ const ALL_CODES = Object.keys(FIAT_CURRENCIES).sort();
 const DEFAULT_FAVS = ["GBP", "EUR", "USD", "CHF", "JPY", "AUD", "THB"];
 const ZERO_DECIMAL = new Set(["JPY","KRW","HUF","ISK","IDR","VND","CLP","PYG","UGX","GNF","KMF","RWF","XAF","XOF","XPF","VUV","BIF","DJF","MGA","IQD","IRR","LAK","MMK","KPW","SYP","SOS","LBP","STN","MWK","SLE","SSP","SDG","CDF","HTG","KHR","UZS","TZS"]);
 
-const API_PRIMARY = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies";
-const API_FALLBACK = "https://latest.currency-api.pages.dev/v1/currencies";
+const API_PRIMARY = "https://latest.currency-api.pages.dev/v1/currencies";
+const API_FALLBACK = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies";
 
 // Use localStorage for favourites persistence (works in PWA / browser)
 function loadFavs() {
