@@ -446,7 +446,7 @@ export default function App() {
       </div>
 
       {/* Keypad */}
-      <div style={{ padding: "10px 20px 20px", marginTop: "auto" }}>
+      <div style={{ padding: "10px 20px 20px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
           {keys.flat().map((k, i) => {
             if (k === null) return <div key={i} />;
@@ -465,7 +465,7 @@ export default function App() {
       </div>
 
       {/* Footer */}
-      <div style={{ padding: "0 20px 12px", textAlign: "center", color: "#4b5563", fontSize: 10, fontFamily: "var(--mono)", lineHeight: 1.6 }}>
+      <div style={{ padding: "0 20px 12px", marginTop: "auto", textAlign: "center", color: "#4b5563", fontSize: 10, fontFamily: "var(--mono)", lineHeight: 1.6 }}>
         v{APP_VERSION} · deployed {BUILD_DATE_FMT} · refreshed {REFRESH_TIME_FMT}
       </div>
 
