@@ -165,6 +165,13 @@ const ZERO_DECIMAL = new Set(["JPY","KRW","HUF","ISK","IDR","VND","CLP","PYG","U
 const API_PRIMARY = "https://latest.currency-api.pages.dev/v1/currencies";
 const API_FALLBACK = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies";
 
+// Build-time constants injected by Vite (see vite.config.js).
+const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
+const BUILD_DATE_ISO = typeof __BUILD_DATE__ !== "undefined" ? __BUILD_DATE__ : new Date().toISOString();
+const BUILD_DATE_FMT = BUILD_DATE_ISO.slice(0, 10);
+// Captured once at module load, i.e. when the page is (re)freshed.
+const LOAD_TIME_FMT = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
 // Use localStorage for favourites persistence (works in PWA / browser)
 function loadFavs() {
   try {
@@ -455,6 +462,11 @@ export default function App() {
             );
           })}
         </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{ padding: "0 20px 12px", textAlign: "center", color: "#4b5563", fontSize: 10, fontFamily: "var(--mono)", lineHeight: 1.6 }}>
+        v{APP_VERSION} · deployed {BUILD_DATE_FMT} · loaded {LOAD_TIME_FMT}
       </div>
 
       {/* Picker */}
