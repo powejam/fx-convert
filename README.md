@@ -9,7 +9,7 @@ An ad-free, open-source currency converter with 150+ fiat currencies and mid-mar
 - **150+ fiat currencies** — from major pairs (GBP, EUR, USD, JPY) to less common ones (AED, PKR, NGN, VND, KES and many more)
 - **Mid-market rates** — no markup, no spread, just the interbank midpoint rate
 - **Favourites** — star the currencies you use most for quick access; persisted across sessions
-- **Recents** — recently-selected currencies float to the top of the picker so they're one tap from being starred
+- **Recents** — recently-selected currencies appear in their own section between favourites and the full list, ready to be starred
 - **Calculator keypad** — tap-friendly number entry designed for mobile use
 - **Swap button** — instantly reverse the conversion direction
 - **Quick bar** — one-tap switching between favourite target currencies with live rate preview

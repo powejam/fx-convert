@@ -227,9 +227,9 @@ function Picker({ isOpen, onClose, onSelect, selected, favourites, recents, onTo
 
   const q = search.toLowerCase();
   const matches = c => c.toLowerCase().includes(q) || FIAT_CURRENCIES[c].name.toLowerCase().includes(q);
-  // Recents shown at the top so a freshly-picked currency is one tap from
-  // being starred. Exclude codes that are already favourites — they live in
-  // their own section just below and would otherwise duplicate.
+  // Recents sit between favourites and the full list — handy place to find
+  // a recently-picked currency to star. Codes already in favourites are
+  // suppressed here to avoid showing the same row twice.
   const recentList = recents.filter(c => FIAT_CURRENCIES[c] && !favourites.includes(c) && matches(c));
   const recentSet = new Set(recentList);
   const filtered = ALL_CODES.filter(matches);
@@ -276,17 +276,17 @@ function Picker({ isOpen, onClose, onSelect, selected, favourites, recents, onTo
           />
         </div>
         <div style={{ overflowY: "auto", flex: 1, padding: "8px 12px 20px", WebkitOverflowScrolling: "touch" }}>
-          {recentList.length > 0 && (
-            <>
-              <div style={{ padding: "8px 8px 4px", color: "#9ca3af", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>↻ Recent</div>
-              {recentList.map(c => <Row key={`recent-${c}`} code={c} />)}
-              <div style={{ height: 1, background: "#2a2d35", margin: "8px 0" }} />
-            </>
-          )}
           {favs.length > 0 && (
             <>
               <div style={{ padding: "8px 8px 4px", color: "#f59e0b", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>★ Favourites</div>
               {favs.map(c => <Row key={c} code={c} />)}
+              <div style={{ height: 1, background: "#2a2d35", margin: "8px 0" }} />
+            </>
+          )}
+          {recentList.length > 0 && (
+            <>
+              <div style={{ padding: "8px 8px 4px", color: "#9ca3af", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>↻ Recent</div>
+              {recentList.map(c => <Row key={`recent-${c}`} code={c} />)}
               <div style={{ height: 1, background: "#2a2d35", margin: "8px 0" }} />
             </>
           )}
