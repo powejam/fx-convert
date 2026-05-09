@@ -61,7 +61,7 @@ This starts a Vite dev server at `http://localhost:5173` with hot reload.
 - **React 18** — UI components
 - **Vite 5** — build tooling and dev server
 - **fawazahmed0/exchange-api** — free exchange rate data, no API key, no rate limits, 200+ currencies, CC0 licensed
-- **Service worker** — offline caching with network-first strategy for rate data
+- **Service worker** — network-first with a short timeout for the app shell (so a refresh always picks up new versions when online) and for rate data, with cache fallback when offline or slow
 - **localStorage** — favourite currency persistence
 - **GitHub Actions** — automated build and deploy to GitHub Pages
 

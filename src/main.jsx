@@ -11,6 +11,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 // Register service worker for offline support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/fx-convert/sw.js').catch(() => {})
+    navigator.serviceWorker.register('/fx-convert/sw.js', { updateViaCache: 'none' }).catch(() => {})
   })
 }
