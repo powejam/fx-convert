@@ -170,7 +170,7 @@ const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "
 const BUILD_DATE_ISO = typeof __BUILD_DATE__ !== "undefined" ? __BUILD_DATE__ : new Date().toISOString();
 const BUILD_DATE_FMT = BUILD_DATE_ISO.slice(0, 10);
 // Captured once at module load, i.e. when the page is (re)freshed.
-const LOAD_TIME_FMT = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const REFRESH_TIME_FMT = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
 // Use localStorage for favourites persistence (works in PWA / browser)
 function loadFavs() {
@@ -466,7 +466,7 @@ export default function App() {
 
       {/* Footer */}
       <div style={{ padding: "0 20px 12px", textAlign: "center", color: "#4b5563", fontSize: 10, fontFamily: "var(--mono)", lineHeight: 1.6 }}>
-        v{APP_VERSION} · deployed {BUILD_DATE_FMT} · loaded {LOAD_TIME_FMT}
+        v{APP_VERSION} · deployed {BUILD_DATE_FMT} · refreshed {REFRESH_TIME_FMT}
       </div>
 
       {/* Picker */}
