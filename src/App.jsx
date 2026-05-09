@@ -368,7 +368,7 @@ export default function App() {
   const fi = FIAT_CURRENCIES[from], ti = FIAT_CURRENCIES[to];
 
   return (
-    <div style={{ "--mono": "'JetBrains Mono','SF Mono',monospace", minHeight: "100vh", background: "linear-gradient(180deg,#0d0f13,#141720)", color: "#e5e7eb", fontFamily: "'SF Pro Display',-apple-system,'Segoe UI',sans-serif", display: "flex", flexDirection: "column", maxWidth: 440, margin: "0 auto" }}>
+    <div style={{ "--mono": "'JetBrains Mono','SF Mono',monospace", minHeight: "100dvh", background: "linear-gradient(180deg,#0d0f13,#141720)", color: "#e5e7eb", fontFamily: "'SF Pro Display',-apple-system,'Segoe UI',sans-serif", display: "flex", flexDirection: "column", maxWidth: 440, margin: "0 auto" }}>
 
       {/* Header */}
       <div style={{ padding: "16px 20px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
