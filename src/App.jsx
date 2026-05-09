@@ -176,6 +176,18 @@ function storeFavs(favs) {
   try { localStorage.setItem("fx-favs", JSON.stringify(favs)); } catch {}
 }
 
+const RECENTS_LIMIT = 8;
+function loadRecents() {
+  try {
+    const stored = localStorage.getItem("fx-recents");
+    const parsed = stored ? JSON.parse(stored) : [];
+    return Array.isArray(parsed) ? parsed.filter(c => FIAT_CURRENCIES[c]).slice(0, RECENTS_LIMIT) : [];
+  } catch { return []; }
+}
+function storeRecents(r) {
+  try { localStorage.setItem("fx-recents", JSON.stringify(r)); } catch {}
+}
+
 function fmt(num, cur) {
   if (isNaN(num) || num === 0) return "0";
   const d = ZERO_DECIMAL.has(cur) ? 0 : 2;
@@ -196,7 +208,7 @@ async function fetchRates(base) {
 }
 
 /* ─── Currency Picker ─── */
-function Picker({ isOpen, onClose, onSelect, selected, favourites, onToggleFav, title }) {
+function Picker({ isOpen, onClose, onSelect, selected, favourites, recents, onToggleFav, title }) {
   const [search, setSearch] = useState("");
   const ref = useRef(null);
 
@@ -207,9 +219,15 @@ function Picker({ isOpen, onClose, onSelect, selected, favourites, onToggleFav, 
   if (!isOpen) return null;
 
   const q = search.toLowerCase();
-  const filtered = ALL_CODES.filter(c => c.toLowerCase().includes(q) || FIAT_CURRENCIES[c].name.toLowerCase().includes(q));
+  const matches = c => c.toLowerCase().includes(q) || FIAT_CURRENCIES[c].name.toLowerCase().includes(q);
+  // Recents shown at the top so a freshly-picked currency is one tap from
+  // being starred. Exclude codes that are already favourites — they live in
+  // their own section just below and would otherwise duplicate.
+  const recentList = recents.filter(c => FIAT_CURRENCIES[c] && !favourites.includes(c) && matches(c));
+  const recentSet = new Set(recentList);
+  const filtered = ALL_CODES.filter(matches);
   const favs = filtered.filter(c => favourites.includes(c));
-  const rest = filtered.filter(c => !favourites.includes(c));
+  const rest = filtered.filter(c => !favourites.includes(c) && !recentSet.has(c));
 
   const Row = ({ code }) => {
     const cur = FIAT_CURRENCIES[code];
@@ -251,6 +269,13 @@ function Picker({ isOpen, onClose, onSelect, selected, favourites, onToggleFav, 
           />
         </div>
         <div style={{ overflowY: "auto", flex: 1, padding: "8px 12px 20px", WebkitOverflowScrolling: "touch" }}>
+          {recentList.length > 0 && (
+            <>
+              <div style={{ padding: "8px 8px 4px", color: "#9ca3af", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>↻ Recent</div>
+              {recentList.map(c => <Row key={`recent-${c}`} code={c} />)}
+              <div style={{ height: 1, background: "#2a2d35", margin: "8px 0" }} />
+            </>
+          )}
           {favs.length > 0 && (
             <>
               <div style={{ padding: "8px 8px 4px", color: "#f59e0b", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>★ Favourites</div>
@@ -276,11 +301,20 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [favs, setFavs] = useState(loadFavs);
+  const [recents, setRecents] = useState(loadRecents);
   const [picker, setPicker] = useState(null);
 
   const saveFavs = useCallback((f) => {
     setFavs(f);
     storeFavs(f);
+  }, []);
+
+  const pushRecent = useCallback((code) => {
+    setRecents(prev => {
+      const next = [code, ...prev.filter(c => c !== code)].slice(0, RECENTS_LIMIT);
+      storeRecents(next);
+      return next;
+    });
   }, []);
 
   useEffect(() => {
@@ -430,10 +464,12 @@ export default function App() {
         onSelect={code => {
           if (picker === "from") { if (code === to) setTo(from); setFrom(code); }
           else { if (code === from) setFrom(to); setTo(code); }
+          pushRecent(code);
           setPicker(null);
         }}
         selected={picker === "from" ? from : to}
         favourites={favs}
+        recents={recents}
         onToggleFav={toggleFav}
         title={picker === "from" ? "Convert from" : "Convert to"}
       />
