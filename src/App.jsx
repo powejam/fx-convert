@@ -692,7 +692,7 @@ export default function App() {
           </div>
         )}
         {DETECTED_LABEL && (
-          <div style={{ textAlign: "center", padding: "1px 0 0", fontSize: 10, fontFamily: "var(--mono)", color: "#4b5563" }}>
+          <div style={{ textAlign: "center", padding: "8px 0 0", fontSize: 10, fontFamily: "var(--mono)", color: "#4b5563" }}>
             📍 {DETECTED_LABEL}
           </div>
         )}
