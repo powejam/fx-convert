@@ -317,17 +317,41 @@ function fmt(num, cur) {
   return num.toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
+// Returns { data, source } so the UI can show where the numbers came from:
+// "primary" (currency-api) or "fallback" (jsDelivr CDN).
 async function fetchRates(base) {
   const c = base.toLowerCase();
   try {
     const r = await fetch(`${API_PRIMARY}/${c}.min.json`);
     if (!r.ok) throw new Error();
-    return await r.json();
+    return { data: await r.json(), source: "primary" };
   } catch {
     const r = await fetch(`${API_FALLBACK}/${c}.min.json`);
     if (!r.ok) throw new Error("Failed");
-    return await r.json();
+    return { data: await r.json(), source: "fallback" };
   }
+}
+
+const SLOW_MS = 2500; // network considered "slow" if a fetch runs longer than this
+const SOURCE_LABEL = { primary: "currency-api", fallback: "jsDelivr", cache: "saved data" };
+
+// Single source of truth for the data-status line: freshness, data source and
+// connection state collapse into one message so we never stack competing banners.
+function statusLine({ loading, refreshing, stale, online, slow, source, fetchedAt }) {
+  const when = fetchedAt ? " from " + fmtClock(fetchedAt) : "";
+  const info = "#60a5fa", warn = "#f59e0b", muted = "#6b7280";
+  if (loading) {
+    if (!online) return { text: "⚠ Offline — no saved rates yet", color: warn };
+    return { text: slow ? "↻ Slow connection — fetching rates…" : "↻ Fetching latest rates…", color: slow ? warn : info };
+  }
+  if (refreshing) {
+    return { text: `↻ ${slow ? "Slow connection — updating…" : "Updating…"} · saved${when}`, color: slow ? warn : info };
+  }
+  if (stale) {
+    return { text: (online ? "⚠ Update failed · saved rates" : "⚠ Offline · saved rates") + when, color: warn };
+  }
+  if (source) return { text: `● Live · ${SOURCE_LABEL[source] || source}`, color: muted };
+  return null;
 }
 
 // Flatten the API response into { CODE: rate } for every supported currency,
@@ -459,6 +483,10 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false); // fetching while cached data is shown
   const [stale, setStale] = useState(false);       // shown rates are cached, not yet confirmed fresh
   const [fetchedAt, setFetchedAt] = useState(null); // when the shown rates were fetched
+  const [source, setSource] = useState(null);       // "primary" | "fallback" | "cache"
+  const [slow, setSlow] = useState(false);          // current fetch is running slowly
+  const [online, setOnline] = useState(() => (typeof navigator !== "undefined" ? navigator.onLine : true));
+  const [reloadKey, setReloadKey] = useState(0);    // bumped to force a refetch (e.g. on reconnect)
   const [error, setError] = useState(null);
   const [favs, setFavs] = useState(loadFavs);
   const [recents, setRecents] = useState(loadRecents);
@@ -481,9 +509,22 @@ export default function App() {
     });
   }, []);
 
+  // Track connectivity; on reconnect, force a refetch of the current base.
+  useEffect(() => {
+    const goOnline = () => { setOnline(true); setReloadKey(k => k + 1); };
+    const goOffline = () => setOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
+
   useEffect(() => {
     let dead = false;
     setError(null);
+    setSlow(false);
 
     // Paint cached rates immediately (if any) and revalidate in the background;
     // otherwise show the cold-load spinner.
@@ -492,6 +533,7 @@ export default function App() {
       setRates(cached.rates);
       setRateDate(cached.date || "");
       setFetchedAt(cached.fetchedAt || null);
+      setSource("cache");
       setStale(true);
       setLoading(false);
       setRefreshing(true);
@@ -499,38 +541,47 @@ export default function App() {
       setRates(null);
       setRateDate("");
       setFetchedAt(null);
+      setSource(null);
       setStale(false);
       setLoading(true);
       setRefreshing(false);
     }
 
-    fetchRates(from).then(data => {
+    // Flag a slow connection if the fetch hasn't resolved in time.
+    const slowTimer = setTimeout(() => { if (!dead) setSlow(true); }, SLOW_MS);
+
+    fetchRates(from).then(({ data, source: src }) => {
       if (dead) return;
       const norm = normalizeRates(data, from);
       const now = Date.now();
       setRates(norm);
       setRateDate(data.date || "daily");
       setFetchedAt(now);
+      setSource(src);
       setStale(false);
       setRefreshing(false);
       setLoading(false);
+      setSlow(false);
       storeCachedRates(from, norm, data.date || "daily", now);
     }).catch(() => {
       if (dead) return;
       setRefreshing(false);
+      setSlow(false);
       if (cached) {
         setStale(true); // keep the cached rates on screen, flagged as saved
       } else {
         setError("Network error — check connection");
         setLoading(false);
       }
-    });
-    return () => { dead = true; };
-  }, [from]);
+    }).finally(() => clearTimeout(slowTimer));
+
+    return () => { dead = true; clearTimeout(slowTimer); };
+  }, [from, reloadKey]);
 
   const num = parseFloat(amount) || 0;
   const rate = rates?.[to] ?? 0;
   const converted = num * rate;
+  const status = error ? null : statusLine({ loading, refreshing, stale, online, slow, source, fetchedAt });
 
   const keypad = (key) => {
     setAmount(prev => {
@@ -551,7 +602,7 @@ export default function App() {
   const fi = FIAT_CURRENCIES[from], ti = FIAT_CURRENCIES[to];
 
   return (
-    <div style={{ "--mono": "'JetBrains Mono','SF Mono',monospace", minHeight: "100dvh", background: "linear-gradient(180deg,#0d0f13,#141720)", color: "#e5e7eb", fontFamily: "'SF Pro Display',-apple-system,'Segoe UI',sans-serif", display: "flex", flexDirection: "column", maxWidth: 440, margin: "0 auto" }}>
+    <div style={{ "--mono": "'JetBrains Mono','SF Mono',monospace", background: "linear-gradient(180deg,#0d0f13,#141720)", color: "#e5e7eb", fontFamily: "'SF Pro Display',-apple-system,'Segoe UI',sans-serif", display: "flex", flexDirection: "column", maxWidth: 440, margin: "0 auto" }}>
 
       {/* Header */}
       <div style={{ padding: "16px 20px 8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -605,12 +656,10 @@ export default function App() {
         )}
         {error && <div style={{ textAlign: "center", padding: "8px 0", color: "#ef4444", fontSize: 12 }}>{error}</div>}
 
-        {/* Freshness: revalidating over cached data, or showing saved rates after a failed refresh */}
-        {!loading && !error && (refreshing || stale) && (
-          <div style={{ textAlign: "center", padding: "2px 0 0", fontSize: 10.5, fontFamily: "var(--mono)", color: refreshing ? "#60a5fa" : "#f59e0b" }}>
-            {refreshing
-              ? "↻ Updating… showing last saved rates"
-              : `⚠ Showing saved rates${fetchedAt ? " from " + fmtClock(fetchedAt) : ""}`}
+        {/* Data status: freshness, data source and connection collapsed into one line */}
+        {status && (
+          <div style={{ textAlign: "center", padding: "2px 0 0", fontSize: 10.5, fontFamily: "var(--mono)", color: status.color }}>
+            {status.text}
           </div>
         )}
       </div>
@@ -638,7 +687,7 @@ export default function App() {
       </div>
 
       {/* Keypad */}
-      <div style={{ padding: "10px 20px 20px" }}>
+      <div style={{ padding: "8px 20px 8px" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
           {keys.flat().map((k, i) => {
             if (k === null) return <div key={i} />;
@@ -657,7 +706,7 @@ export default function App() {
       </div>
 
       {/* Footer */}
-      <div style={{ padding: "0 20px 12px", marginTop: "auto", textAlign: "center", color: "#4b5563", fontSize: 10, fontFamily: "var(--mono)", lineHeight: 1.6 }}>
+      <div style={{ padding: "6px 20px 14px", textAlign: "center", color: "#4b5563", fontSize: 10, fontFamily: "var(--mono)", lineHeight: 1.6 }}>
         v{APP_VERSION} · deployed {BUILD_DATE_FMT} · refreshed {REFRESH_TIME_FMT}
       </div>
 
