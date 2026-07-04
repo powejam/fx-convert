@@ -162,6 +162,94 @@ const ALL_CODES = Object.keys(FIAT_CURRENCIES).sort();
 const DEFAULT_FAVS = ["GBP", "EUR", "USD", "CHF", "JPY", "AUD", "THB"];
 const ZERO_DECIMAL = new Set(["JPY","KRW","HUF","ISK","IDR","VND","CLP","PYG","UGX","GNF","KMF","RWF","XAF","XOF","XPF","VUV","BIF","DJF","MGA","IQD","IRR","LAK","MMK","KPW","SYP","SOS","LBP","STN","MWK","SLE","SSP","SDG","CDF","HTG","KHR","UZS","TZS"]);
 
+// The target currency is fixed to GBP by default; the source is seeded from the
+// user's location (see loadPair). If the detected location currency IS GBP the
+// target falls back to the last-used currency, then EUR (see change doc).
+const TARGET_DEFAULT = "GBP";
+const SOURCE_FALLBACK = "USD"; // used only when location can't be determined
+
+// ISO 3166-1 alpha-2 country → currency code. Only currencies present in
+// FIAT_CURRENCIES are useful here; unmapped countries fall back to SOURCE_FALLBACK.
+// Shared currencies (EUR, the CFA francs, XCD…) list each member country.
+const COUNTRY_TO_CURRENCY = {
+  // Eurozone + EUR users
+  AT:"EUR",BE:"EUR",CY:"EUR",EE:"EUR",FI:"EUR",FR:"EUR",DE:"EUR",GR:"EUR",IE:"EUR",
+  IT:"EUR",LV:"EUR",LT:"EUR",LU:"EUR",MT:"EUR",NL:"EUR",PT:"EUR",SK:"EUR",SI:"EUR",
+  ES:"EUR",HR:"EUR",AD:"EUR",MC:"EUR",SM:"EUR",VA:"EUR",ME:"EUR",XK:"EUR",
+  // Rest of the world
+  AE:"AED",AF:"AFN",AL:"ALL",AM:"AMD",AO:"AOA",AR:"ARS",AU:"AUD",AZ:"AZN",BA:"BAM",
+  BB:"BBD",BD:"BDT",BG:"BGN",BH:"BHD",BI:"BIF",BM:"BMD",BN:"BND",BO:"BOB",BR:"BRL",
+  BS:"BSD",BT:"BTN",BW:"BWP",BY:"BYN",BZ:"BZD",CA:"CAD",CD:"CDF",CH:"CHF",LI:"CHF",
+  CL:"CLP",CN:"CNY",CO:"COP",CR:"CRC",CU:"CUP",CV:"CVE",CZ:"CZK",DJ:"DJF",DK:"DKK",
+  FO:"DKK",GL:"DKK",DO:"DOP",DZ:"DZD",EG:"EGP",ER:"ERN",ET:"ETB",FJ:"FJD",FK:"FKP",
+  GB:"GBP",IM:"GBP",JE:"GBP",GG:"GBP",GE:"GEL",GH:"GHS",GI:"GIP",GM:"GMD",GN:"GNF",
+  GT:"GTQ",GY:"GYD",HK:"HKD",HN:"HNL",HT:"HTG",HU:"HUF",ID:"IDR",IL:"ILS",PS:"ILS",
+  IN:"INR",IQ:"IQD",IR:"IRR",IS:"ISK",JM:"JMD",JO:"JOD",JP:"JPY",KE:"KES",KG:"KGS",
+  KH:"KHR",KM:"KMF",KP:"KPW",KR:"KRW",KW:"KWD",KY:"KYD",KZ:"KZT",LA:"LAK",LB:"LBP",
+  LK:"LKR",LR:"LRD",LS:"LSL",LY:"LYD",MA:"MAD",EH:"MAD",MD:"MDL",MG:"MGA",MK:"MKD",
+  MM:"MMK",MN:"MNT",MO:"MOP",MR:"MRU",MU:"MUR",MV:"MVR",MW:"MWK",MX:"MXN",MY:"MYR",
+  MZ:"MZN",NA:"NAD",NG:"NGN",NI:"NIO",NO:"NOK",SJ:"NOK",NP:"NPR",NZ:"NZD",CK:"NZD",
+  OM:"OMR",PA:"PAB",PE:"PEN",PG:"PGK",PH:"PHP",PK:"PKR",PL:"PLN",PY:"PYG",QA:"QAR",
+  RO:"RON",RS:"RSD",RU:"RUB",RW:"RWF",SA:"SAR",SB:"SBD",SC:"SCR",SD:"SDG",SE:"SEK",
+  SG:"SGD",SH:"SHP",SL:"SLE",SO:"SOS",SR:"SRD",SS:"SSP",ST:"STN",SY:"SYP",SZ:"SZL",
+  TH:"THB",TJ:"TJS",TM:"TMT",TN:"TND",TO:"TOP",TR:"TRY",TT:"TTD",TW:"TWD",TZ:"TZS",
+  UA:"UAH",UG:"UGX",US:"USD",EC:"USD",SV:"USD",TL:"USD",UY:"UYU",UZ:"UZS",VE:"VES",
+  VN:"VND",VU:"VUV",WS:"WST",YE:"YER",ZA:"ZAR",ZM:"ZMW",ZW:"ZWL",
+  // West African CFA (XOF)
+  BJ:"XOF",BF:"XOF",CI:"XOF",GW:"XOF",ML:"XOF",NE:"XOF",SN:"XOF",TG:"XOF",
+  // Central African CFA (XAF)
+  CM:"XAF",CF:"XAF",TD:"XAF",CG:"XAF",GQ:"XAF",GA:"XAF",
+  // CFP franc (XPF)
+  PF:"XPF",NC:"XPF",WF:"XPF",
+  // East Caribbean dollar (XCD)
+  AG:"XCD",DM:"XCD",GD:"XCD",KN:"XCD",LC:"XCD",VC:"XCD",AI:"XCD",MS:"XCD",
+};
+
+// Fallback only: used when navigator.languages carries no region subtag.
+// Covers common IANA zones; anything unlisted falls through to SOURCE_FALLBACK.
+const TIMEZONE_TO_COUNTRY = {
+  "Europe/London":"GB","Europe/Paris":"FR","Europe/Berlin":"DE","Europe/Madrid":"ES",
+  "Europe/Rome":"IT","Europe/Amsterdam":"NL","Europe/Dublin":"IE","Europe/Lisbon":"PT",
+  "Europe/Zurich":"CH","Europe/Vienna":"AT","Europe/Brussels":"BE","Europe/Stockholm":"SE",
+  "Europe/Oslo":"NO","Europe/Copenhagen":"DK","Europe/Helsinki":"FI","Europe/Warsaw":"PL",
+  "Europe/Prague":"CZ","Europe/Budapest":"HU","Europe/Athens":"GR","Europe/Bucharest":"RO",
+  "Europe/Moscow":"RU","Europe/Istanbul":"TR","Europe/Kyiv":"UA","Europe/Kiev":"UA",
+  "America/New_York":"US","America/Chicago":"US","America/Denver":"US","America/Los_Angeles":"US",
+  "America/Toronto":"CA","America/Vancouver":"CA","America/Mexico_City":"MX","America/Sao_Paulo":"BR",
+  "America/Argentina/Buenos_Aires":"AR","America/Bogota":"CO","America/Lima":"PE","America/Santiago":"CL",
+  "Asia/Tokyo":"JP","Asia/Shanghai":"CN","Asia/Hong_Kong":"HK","Asia/Singapore":"SG","Asia/Seoul":"KR",
+  "Asia/Kolkata":"IN","Asia/Calcutta":"IN","Asia/Bangkok":"TH","Asia/Jakarta":"ID","Asia/Manila":"PH",
+  "Asia/Kuala_Lumpur":"MY","Asia/Dubai":"AE","Asia/Karachi":"PK","Asia/Dhaka":"BD","Asia/Ho_Chi_Minh":"VN",
+  "Asia/Taipei":"TW","Asia/Jerusalem":"IL","Asia/Riyadh":"SA","Asia/Tehran":"IR",
+  "Australia/Sydney":"AU","Australia/Melbourne":"AU","Australia/Perth":"AU","Pacific/Auckland":"NZ",
+  "Africa/Johannesburg":"ZA","Africa/Cairo":"EG","Africa/Lagos":"NG","Africa/Nairobi":"KE",
+  "Africa/Casablanca":"MA","Africa/Accra":"GH",
+};
+
+// Best-effort, permissionless location guess: region subtag from navigator.languages
+// first (most specific), then IANA timezone. Returns an ISO country code or null.
+function detectCountry() {
+  try {
+    const langs = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
+    for (const l of langs) {
+      const m = /[-_]([A-Za-z]{2})$/.exec(l || "");
+      if (m) return m[1].toUpperCase();
+    }
+  } catch {}
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (tz && TIMEZONE_TO_COUNTRY[tz]) return TIMEZONE_TO_COUNTRY[tz];
+  } catch {}
+  return null;
+}
+
+// Location currency, or null if we can't map it to a supported currency.
+function detectLocalCurrency() {
+  const country = detectCountry();
+  const cur = country && COUNTRY_TO_CURRENCY[country];
+  return cur && FIAT_CURRENCIES[cur] ? cur : null;
+}
+
 const API_PRIMARY = "https://latest.currency-api.pages.dev/v1/currencies";
 const API_FALLBACK = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies";
 
@@ -193,6 +281,34 @@ function loadRecents() {
 }
 function storeRecents(r) {
   try { localStorage.setItem("fx-recents", JSON.stringify(r)); } catch {}
+}
+
+// "Last currency in the cache" for the GBP-home edge case: the most recent
+// non-GBP currency the user has picked, or null if there's nothing usable.
+function lastCachedCurrency() {
+  const c = loadRecents().find(x => x !== TARGET_DEFAULT && FIAT_CURRENCIES[x]);
+  return c || null;
+}
+
+// Resolve the initial { from, to } pair. A previously-stored pair always wins
+// (so a refresh restores the user's last choice); only on a first-ever visit do
+// we seed the source from location and the target from GBP.
+function loadPair() {
+  try {
+    const f = localStorage.getItem("fx-from");
+    const t = localStorage.getItem("fx-to");
+    if (f && t && FIAT_CURRENCIES[f] && FIAT_CURRENCIES[t]) return { from: f, to: t };
+  } catch {}
+  const from = detectLocalCurrency() || SOURCE_FALLBACK;
+  let to = TARGET_DEFAULT;
+  if (from === TARGET_DEFAULT) to = lastCachedCurrency() || "EUR";
+  return { from, to };
+}
+function storePair(from, to) {
+  try {
+    localStorage.setItem("fx-from", from);
+    localStorage.setItem("fx-to", to);
+  } catch {}
 }
 
 function fmt(num, cur) {
@@ -301,8 +417,9 @@ function Picker({ isOpen, onClose, onSelect, selected, favourites, recents, onTo
 /* ─── Main App ─── */
 export default function App() {
   const [amount, setAmount] = useState("1");
-  const [from, setFrom] = useState("GBP");
-  const [to, setTo] = useState("EUR");
+  const [defaults] = useState(loadPair); // computed once, on first mount
+  const [from, setFrom] = useState(defaults.from);
+  const [to, setTo] = useState(defaults.to);
   const [rates, setRates] = useState(null);
   const [rateDate, setRateDate] = useState("");
   const [loading, setLoading] = useState(true);
@@ -315,6 +432,10 @@ export default function App() {
     setFavs(f);
     storeFavs(f);
   }, []);
+
+  // Persist the last-used pair so a refresh restores it instead of re-seeding
+  // from location.
+  useEffect(() => { storePair(from, to); }, [from, to]);
 
   const pushRecent = useCallback((code) => {
     setRecents(prev => {
