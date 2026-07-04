@@ -17,6 +17,8 @@
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
       body { background: #141720; overflow-x: hidden; }
+      @keyframes fxpulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+      @media (prefers-reduced-motion: reduce) { .fx-pulse { animation: none !important; } }
     </style>
   </head>
   <body>

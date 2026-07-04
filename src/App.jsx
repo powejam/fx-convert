@@ -250,6 +250,24 @@ function detectLocalCurrency() {
   return cur && FIAT_CURRENCIES[cur] ? cur : null;
 }
 
+// Country flag emoji from an ISO 3166-1 alpha-2 code (regional indicators).
+function flagEmoji(cc) {
+  if (!cc || cc.length !== 2) return "";
+  return cc.toUpperCase().replace(/./g, c => String.fromCodePoint(127397 + c.charCodeAt(0)));
+}
+// Human country name from its code, e.g. "GB" → "United Kingdom".
+function countryName(cc) {
+  if (!cc) return null;
+  try { return new Intl.DisplayNames(["en-GB"], { type: "region" }).of(cc) || cc; }
+  catch { return cc; }
+}
+// Detected once at load, e.g. "🇬🇧 United Kingdom · GBP" — or null if unknown.
+const DETECTED_COUNTRY = detectCountry();
+const DETECTED_CURRENCY = detectLocalCurrency();
+const DETECTED_LABEL = DETECTED_COUNTRY && DETECTED_CURRENCY
+  ? `${flagEmoji(DETECTED_COUNTRY)} ${countryName(DETECTED_COUNTRY)} · ${DETECTED_CURRENCY}`.trim()
+  : null;
+
 const API_PRIMARY = "https://latest.currency-api.pages.dev/v1/currencies";
 const API_FALLBACK = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies";
 
@@ -335,22 +353,30 @@ async function fetchRates(base) {
 const SLOW_MS = 2500; // network considered "slow" if a fetch runs longer than this
 const SOURCE_LABEL = { primary: "currency-api", fallback: "jsDelivr", cache: "saved data" };
 
+// The status "state" drives the leading dot: updating = orange (pulsing),
+// live = green, stale/offline = red. Text is kept muted so the dot reads as
+// the indicator.
+const STATUS_STYLE = {
+  updating: { dot: "#f59e0b", pulse: true },
+  live:     { dot: "#34d399", pulse: false },
+  stale:    { dot: "#ef4444", pulse: false },
+};
+
 // Single source of truth for the data-status line: freshness, data source and
 // connection state collapse into one message so we never stack competing banners.
 function statusLine({ loading, refreshing, stale, online, slow, source, fetchedAt }) {
   const when = fetchedAt ? " from " + fmtClock(fetchedAt) : "";
-  const info = "#60a5fa", warn = "#f59e0b", muted = "#6b7280";
   if (loading) {
-    if (!online) return { text: "⚠ Offline — no saved rates yet", color: warn };
-    return { text: slow ? "↻ Slow connection — fetching rates…" : "↻ Fetching latest rates…", color: slow ? warn : info };
+    if (!online) return { text: "Offline — no saved rates yet", state: "stale" };
+    return { text: slow ? "Slow connection — fetching rates…" : "Fetching latest rates…", state: "updating" };
   }
   if (refreshing) {
-    return { text: `↻ ${slow ? "Slow connection — updating…" : "Updating…"} · saved${when}`, color: slow ? warn : info };
+    return { text: `${slow ? "Slow connection — updating…" : "Updating…"} · saved${when}`, state: "updating" };
   }
   if (stale) {
-    return { text: (online ? "⚠ Update failed · saved rates" : "⚠ Offline · saved rates") + when, color: warn };
+    return { text: (online ? "Update failed · saved rates" : "Offline · saved rates") + when, state: "stale" };
   }
-  if (source) return { text: `● Live · ${SOURCE_LABEL[source] || source}`, color: muted };
+  if (source) return { text: `Live · ${SOURCE_LABEL[source] || source}`, state: "live" };
   return null;
 }
 
@@ -582,6 +608,7 @@ export default function App() {
   const rate = rates?.[to] ?? 0;
   const converted = num * rate;
   const status = error ? null : statusLine({ loading, refreshing, stale, online, slow, source, fetchedAt });
+  const st = status ? STATUS_STYLE[status.state] : null;
 
   const keypad = (key) => {
     setAmount(prev => {
@@ -656,10 +683,17 @@ export default function App() {
         )}
         {error && <div style={{ textAlign: "center", padding: "8px 0", color: "#ef4444", fontSize: 12 }}>{error}</div>}
 
-        {/* Data status: freshness, data source and connection collapsed into one line */}
+        {/* Data status: freshness, data source and connection collapsed into one line.
+            Leading dot carries the state — green live, red stale, orange pulsing while updating. */}
         {status && (
-          <div style={{ textAlign: "center", padding: "2px 0 0", fontSize: 10.5, fontFamily: "var(--mono)", color: status.color }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "2px 0 0", fontSize: 10.5, fontFamily: "var(--mono)", color: "#9ca3af" }}>
+            <span className={st.pulse ? "fx-pulse" : undefined} style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: st.dot, marginRight: 6, animation: st.pulse ? "fxpulse 1s ease-in-out infinite" : undefined }} />
             {status.text}
+          </div>
+        )}
+        {DETECTED_LABEL && (
+          <div style={{ textAlign: "center", padding: "1px 0 0", fontSize: 10, fontFamily: "var(--mono)", color: "#4b5563" }}>
+            📍 {DETECTED_LABEL}
           </div>
         )}
       </div>
