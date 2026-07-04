@@ -330,6 +330,39 @@ async function fetchRates(base) {
   }
 }
 
+// Flatten the API response into { CODE: rate } for every supported currency,
+// with the base pinned to 1. Used for both fresh fetches and what we persist.
+function normalizeRates(data, base) {
+  const obj = data[base.toLowerCase()] || {};
+  const norm = {};
+  for (const c of ALL_CODES) {
+    const v = obj[c.toLowerCase()];
+    if (v != null && v > 0) norm[c] = v;
+  }
+  norm[base] = 1;
+  return norm;
+}
+
+// Per-base rate cache in localStorage. Lets us paint the last-known rates
+// instantly on load (stale-while-revalidate) instead of a spinner, and gives
+// the UI something to fall back to when the network is slow or offline.
+function loadCachedRates(base) {
+  try {
+    const p = JSON.parse(localStorage.getItem(`fx-rates-${base}`));
+    if (p && p.rates && typeof p.rates === "object") return p; // { rates, date, fetchedAt }
+  } catch {}
+  return null;
+}
+function storeCachedRates(base, rates, date, fetchedAt) {
+  try { localStorage.setItem(`fx-rates-${base}`, JSON.stringify({ rates, date, fetchedAt })); } catch {}
+}
+
+// ms → local HH:MM, for the "saved rates from …" indicator.
+function fmtClock(ms) {
+  try { return new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); }
+  catch { return ""; }
+}
+
 /* ─── Currency Picker ─── */
 function Picker({ isOpen, onClose, onSelect, selected, favourites, recents, onToggleFav, title }) {
   const [search, setSearch] = useState("");
@@ -422,7 +455,10 @@ export default function App() {
   const [to, setTo] = useState(defaults.to);
   const [rates, setRates] = useState(null);
   const [rateDate, setRateDate] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);   // cold: nothing to show yet
+  const [refreshing, setRefreshing] = useState(false); // fetching while cached data is shown
+  const [stale, setStale] = useState(false);       // shown rates are cached, not yet confirmed fresh
+  const [fetchedAt, setFetchedAt] = useState(null); // when the shown rates were fetched
   const [error, setError] = useState(null);
   const [favs, setFavs] = useState(loadFavs);
   const [recents, setRecents] = useState(loadRecents);
@@ -447,21 +483,47 @@ export default function App() {
 
   useEffect(() => {
     let dead = false;
-    setLoading(true); setError(null);
+    setError(null);
+
+    // Paint cached rates immediately (if any) and revalidate in the background;
+    // otherwise show the cold-load spinner.
+    const cached = loadCachedRates(from);
+    if (cached) {
+      setRates(cached.rates);
+      setRateDate(cached.date || "");
+      setFetchedAt(cached.fetchedAt || null);
+      setStale(true);
+      setLoading(false);
+      setRefreshing(true);
+    } else {
+      setRates(null);
+      setRateDate("");
+      setFetchedAt(null);
+      setStale(false);
+      setLoading(true);
+      setRefreshing(false);
+    }
+
     fetchRates(from).then(data => {
       if (dead) return;
-      const obj = data[from.toLowerCase()] || {};
-      const norm = {};
-      for (const c of ALL_CODES) {
-        const v = obj[c.toLowerCase()];
-        if (v != null && v > 0) norm[c] = v;
-      }
-      norm[from] = 1;
+      const norm = normalizeRates(data, from);
+      const now = Date.now();
       setRates(norm);
       setRateDate(data.date || "daily");
+      setFetchedAt(now);
+      setStale(false);
+      setRefreshing(false);
       setLoading(false);
+      storeCachedRates(from, norm, data.date || "daily", now);
     }).catch(() => {
-      if (!dead) { setError("Network error — check connection"); setLoading(false); }
+      if (dead) return;
+      setRefreshing(false);
+      if (cached) {
+        setStale(true); // keep the cached rates on screen, flagged as saved
+      } else {
+        setError("Network error — check connection");
+        setLoading(false);
+      }
     });
     return () => { dead = true; };
   }, [from]);
@@ -542,6 +604,15 @@ export default function App() {
           </div>
         )}
         {error && <div style={{ textAlign: "center", padding: "8px 0", color: "#ef4444", fontSize: 12 }}>{error}</div>}
+
+        {/* Freshness: revalidating over cached data, or showing saved rates after a failed refresh */}
+        {!loading && !error && (refreshing || stale) && (
+          <div style={{ textAlign: "center", padding: "2px 0 0", fontSize: 10.5, fontFamily: "var(--mono)", color: refreshing ? "#60a5fa" : "#f59e0b" }}>
+            {refreshing
+              ? "↻ Updating… showing last saved rates"
+              : `⚠ Showing saved rates${fetchedAt ? " from " + fmtClock(fetchedAt) : ""}`}
+          </div>
+        )}
       </div>
 
       {/* Quick favs */}
