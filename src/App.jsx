@@ -699,7 +699,7 @@ export default function App() {
       </div>
 
       {/* Quick favs */}
-      <div style={{ padding: "8px 20px 4px", display: "flex", gap: 6, flexWrap: "wrap" }}>
+      <div style={{ padding: "18px 20px 4px", display: "flex", gap: 6, flexWrap: "wrap" }}>
         {favs.filter(c => c !== from && FIAT_CURRENCIES[c]).slice(0, 8).map(code => {
           const cur = FIAT_CURRENCIES[code];
           const qr = rates?.[code];
