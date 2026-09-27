@@ -1,8 +1,8 @@
-const CACHE = 'fx-convert-v1.3';
+const CACHE = 'fx-convert-v1.4';
 const NAV_TIMEOUT_MS = 2500;
 const PRECACHE = [
-  '/fx-convert/',
-  '/fx-convert/index.html',
+  './',
+  './index.html',
 ];
 
 self.addEventListener('install', (e) => {
@@ -15,7 +15,8 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      // Only this app's caches: on powejam.github.io every app shares one origin.
+      Promise.all(keys.filter(k => k.startsWith('fx-convert-') && k !== CACHE).map(k => caches.delete(k)))
     )
   );
   self.clients.claim();

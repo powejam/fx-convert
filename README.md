@@ -2,7 +2,7 @@
 
 An ad-free, open-source currency converter with 150+ fiat currencies and mid-market exchange rates. Built as a Progressive Web App (PWA) — installable on Android and iOS home screens with offline support.
 
-**Live app:** [https://powejam.github.io/fx-convert/](https://powejam.github.io/fx-convert/)
+**Live app:** [https://fx-convert.powejam.com/](https://fx-convert.powejam.com/) (the old `powejam.github.io/fx-convert/` address now shows a "has moved" notice)
 
 ## Features
 
